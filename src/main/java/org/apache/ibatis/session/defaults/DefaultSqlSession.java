@@ -44,6 +44,8 @@ import org.apache.ibatis.session.SqlSession;
  * Note that this class is not Thread-Safe.
  *
  * @author Clinton Begin
+ *
+ * 包含iBatis编程模型
  */
 public class DefaultSqlSession implements SqlSession {
 
@@ -286,6 +288,12 @@ public class DefaultSqlSession implements SqlSession {
     return configuration;
   }
 
+  /**
+   * 传入Mapper接口的class对象
+   * @param type Mapper interface class
+   * @param <T>
+   * @return
+   */
   @Override
   public <T> T getMapper(Class<T> type) {
     return configuration.getMapper(type, this);

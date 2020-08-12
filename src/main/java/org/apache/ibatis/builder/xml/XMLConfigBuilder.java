@@ -51,6 +51,10 @@ import org.apache.ibatis.type.JdbcType;
  * @author Clinton Begin
  * @author Kazuki Shimizu
  */
+
+/**
+ * 解析mybatis-config.xml存放到Configuration
+ */
 public class XMLConfigBuilder extends BaseBuilder {
 
   private boolean parsed;
@@ -91,6 +95,54 @@ public class XMLConfigBuilder extends BaseBuilder {
     this.parser = parser;
   }
 
+  /**
+   * 解析配置文件  存入Configuration对象中
+   * <configuration>
+   *
+   *   <properties resource="org/apache/ibatis/databases/blog/blog-derby.properties"/>
+   *
+   *   <settings>
+   *     <setting name="cacheEnabled" value="true"/>
+   *   </settings>
+   *
+   *   <typeAliases>
+   *     <typeAlias alias="Author" type="org.apache.ibatis.domain.blog.Author"/>
+   *   </typeAliases>
+   *
+   *   <typeHandlers>
+   *     <typeHandler javaType="String" jdbcType="VARCHAR" handler="org.apache.ibatis.builder.CustomStringTypeHandler"/>
+   *   </typeHandlers>
+   *
+   *   <objectFactory type="org.apache.ibatis.builder.ExampleObjectFactory">
+   *     <property name="objectFactoryProperty" value="100"/>
+   *   </objectFactory>
+   *
+   *   <plugins>
+   *     <plugin interceptor="org.apache.ibatis.builder.ExamplePlugin">
+   *       <property name="pluginProperty" value="100"/>
+   *     </plugin>
+   *   </plugins>
+   *
+   *   <environments default="development">
+   *     <environment id="development">
+   *       <transactionManager type="JDBC">
+   *         <property name="" value=""/>
+   *       </transactionManager>
+   *       <dataSource type="UNPOOLED">
+   *         <property name="driver" value="${driver}"/>
+   *         <property name="url" value="${url}"/>
+   *         <property name="username" value="${username}"/>
+   *         <property name="password" value="${password}"/>
+   *       </dataSource>
+   *     </environment>
+   *   </environments>
+   *
+   *   <mappers>
+   *     <mapper resource="org/apache/ibatis/builder/AuthorMapper.xml"/>
+   *   </mappers>
+   * </configuration>
+   * @return
+   */
   public Configuration parse() {
     if (parsed) {
       throw new BuilderException("Each XMLConfigBuilder can only be used once.");
@@ -100,23 +152,38 @@ public class XMLConfigBuilder extends BaseBuilder {
     return configuration;
   }
 
+  /**
+   * 解析configuration下的各个节点
+   * @param root
+   */
   private void parseConfiguration(XNode root) {
     try {
       // issue #117 read properties first
+      // 1. properties
       propertiesElement(root.evalNode("properties"));
+      // 2. settings配置
       Properties settings = settingsAsProperties(root.evalNode("settings"));
       loadCustomVfs(settings);
       loadCustomLogImpl(settings);
+      // 3. 类型别名
       typeAliasesElement(root.evalNode("typeAliases"));
+      // 4. 插件
       pluginElement(root.evalNode("plugins"));
+      // 5. 对象工厂
       objectFactoryElement(root.evalNode("objectFactory"));
+      // 6. 对象包装工厂
       objectWrapperFactoryElement(root.evalNode("objectWrapperFactory"));
+      // 7. 反射包装工厂
       reflectorFactoryElement(root.evalNode("reflectorFactory"));
       settingsElement(settings);
       // read it after objectFactory and objectWrapperFactory issue #631
+      // 8. 环境
       environmentsElement(root.evalNode("environments"));
+      // 9. databaseIdProvider
       databaseIdProviderElement(root.evalNode("databaseIdProvider"));
+      // 10. 类型处理器
       typeHandlerElement(root.evalNode("typeHandlers"));
+      // 11. mappers
       mapperElement(root.evalNode("mappers"));
     } catch (Exception e) {
       throw new BuilderException("Error parsing SQL Mapper Configuration. Cause: " + e, e);
@@ -360,9 +427,15 @@ public class XMLConfigBuilder extends BaseBuilder {
     }
   }
 
+  /**
+   * 解析配置文件的mapper映射器
+   * @param parent
+   * @throws Exception
+   */
   private void mapperElement(XNode parent) throws Exception {
     if (parent != null) {
       for (XNode child : parent.getChildren()) {
+        // 1. 自动扫描包路径下的映射器
         if ("package".equals(child.getName())) {
           String mapperPackage = child.getStringAttribute("name");
           configuration.addMappers(mapperPackage);
@@ -370,18 +443,25 @@ public class XMLConfigBuilder extends BaseBuilder {
           String resource = child.getStringAttribute("resource");
           String url = child.getStringAttribute("url");
           String mapperClass = child.getStringAttribute("class");
+          // 2. 使用类路径的映射器
           if (resource != null && url == null && mapperClass == null) {
             ErrorContext.instance().resource(resource);
             InputStream inputStream = Resources.getResourceAsStream(resource);
+            // 映射器比较复杂，使用XMLMapperBuilder解析
+            // for循环中每个Mapper都重新new一个XMLMapperBuilder对象解析
+            // XxxMapper.xml保存到Configuration对象
             XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, resource, configuration.getSqlFragments());
             mapperParser.parse();
           } else if (resource == null && url != null && mapperClass == null) {
+            // 3. 使用绝对url路径
             ErrorContext.instance().resource(url);
             InputStream inputStream = Resources.getUrlAsStream(url);
             XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, url, configuration.getSqlFragments());
             mapperParser.parse();
           } else if (resource == null && url == null && mapperClass != null) {
+            // 4. 使用java类名
             Class<?> mapperInterface = Resources.classForName(mapperClass);
+            // 直接把这个映射加入配置
             configuration.addMapper(mapperInterface);
           } else {
             throw new BuilderException("A mapper element may only specify a url, resource or class, but not more than one.");

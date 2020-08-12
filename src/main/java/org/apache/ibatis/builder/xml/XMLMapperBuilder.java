@@ -53,6 +53,9 @@ import org.apache.ibatis.type.TypeHandler;
  * @author Clinton Begin
  * @author Kazuki Shimizu
  */
+/**
+ * 解析XxxMapper.xml存放到Configuration
+ */
 public class XMLMapperBuilder extends BaseBuilder {
 
   private final XPathParser parser;
@@ -90,10 +93,16 @@ public class XMLMapperBuilder extends BaseBuilder {
     this.resource = resource;
   }
 
+  /**
+   * 解析XxxMapper.xml配置文件
+   */
   public void parse() {
     if (!configuration.isResourceLoaded(resource)) {
+      // XxxMapper.xml配置文件顶层为mapper标签
       configurationElement(parser.evalNode("/mapper"));
+      // 已加载过的mapper保存一下
       configuration.addLoadedResource(resource);
+      // 绑定映射器到nameSpace
       bindMapperForNamespace();
     }
 
@@ -115,15 +124,23 @@ public class XMLMapperBuilder extends BaseBuilder {
       builderAssistant.setCurrentNamespace(namespace);
       cacheRefElement(context.evalNode("cache-ref"));
       cacheElement(context.evalNode("cache"));
+      // 解析parameterMap
       parameterMapElement(context.evalNodes("/mapper/parameterMap"));
+      // 解析resultMap
       resultMapElements(context.evalNodes("/mapper/resultMap"));
+      // 解析sql   <sql>...</sql>
       sqlElement(context.evalNodes("/mapper/sql"));
+      // 解析select|insert|update|delete语句
       buildStatementFromContext(context.evalNodes("select|insert|update|delete"));
     } catch (Exception e) {
       throw new BuilderException("Error parsing Mapper XML. The XML location is '" + resource + "'. Cause: " + e, e);
     }
   }
 
+  /**
+   * 解析select|insert|update|delete语句
+   * @param list
+   */
   private void buildStatementFromContext(List<XNode> list) {
     if (configuration.getDatabaseId() != null) {
       buildStatementFromContext(list, configuration.getDatabaseId());
@@ -137,6 +154,7 @@ public class XMLMapperBuilder extends BaseBuilder {
       try {
         statementParser.parseStatementNode();
       } catch (IncompleteElementException e) {
+        // 如果出现sql语句不完整，
         configuration.addIncompleteStatement(statementParser);
       }
     }
@@ -416,6 +434,7 @@ public class XMLMapperBuilder extends BaseBuilder {
   }
 
   private void bindMapperForNamespace() {
+    // mapper nameSpace  -- Mapper接口的全限定名
     String namespace = builderAssistant.getCurrentNamespace();
     if (namespace != null) {
       Class<?> boundType = null;
@@ -428,7 +447,9 @@ public class XMLMapperBuilder extends BaseBuilder {
         // Spring may not know the real resource name so we set a flag
         // to prevent loading again this resource from the mapper interface
         // look at MapperAnnotationBuilder#loadXmlResource
+        // 保存nameSpace loadedResources
         configuration.addLoadedResource("namespace:" + namespace);
+        // 保存接口的Class对象  -- Configuration 中的MapperRegistry
         configuration.addMapper(boundType);
       }
     }

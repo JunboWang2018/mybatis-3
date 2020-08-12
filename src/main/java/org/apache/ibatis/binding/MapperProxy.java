@@ -78,10 +78,13 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+    // 代理后，Mapper的所有方法调用时，都会调用这个invoke方法
+    // 并不是所有的方法都需要调用代理对象执行，如果是Object类中定义的方法，如：toString()、 hashCode()等方法，则直接调用即可
     try {
       if (Object.class.equals(method.getDeclaringClass())) {
         return method.invoke(this, args);
       } else {
+        // 去缓存中找MappedMethod
         return cachedInvoker(method).invoke(proxy, method, args, sqlSession);
       }
     } catch (Throwable t) {
